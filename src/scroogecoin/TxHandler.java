@@ -22,8 +22,57 @@ public class TxHandler {
      *     values; and false otherwise.
      */
     public boolean isValidTx(Transaction tx) {
-        // IMPLEMENT THIS
-    	return false;
+    	double dblSumOfOutput = 0;
+    	double dblSumOfInput = 0;
+    	
+    	for (Transaction.Output out : tx.getOutputs()) {
+    		
+    		//(4) check output value is more than zero
+    		if(out.value < 0) return false;
+    		
+    		//Add up all output value in this transaction
+    		dblSumOfOutput += out.value;
+    		
+    	}
+    	
+    	int signing_index = 0;
+    	UTXOPool UniqueUTXOChecked = new UTXOPool();
+    	
+    	for (Transaction.Input in : tx.getInputs()) {
+    		
+    		// Get UTXO for current transaction
+    		byte[] prevHash = in.prevTxHash;
+    		int oIndex = in.outputIndex;
+    		UTXO currUTXO = new UTXO(prevHash,oIndex);
+    		
+    		//(1) check if utxo with prevHash & outputIndex already exist in current UTXO pool
+    		boolean bOutputExists = this.utxoPool.contains(currUTXO);
+    		if (!bOutputExists) return false; //return false if an output does not exist in pool
+    		
+    		//Get current output in pool using current UTXO
+    		Transaction.Output currOutput = this.utxoPool.getTxOutput(currUTXO);
+    		
+    		//(2) check input signature is valid with corresponding output public key
+    		boolean bValidSignature = Crypto.verifySignature(currOutput.address, tx.getRawDataToSign(signing_index),in.signature);
+    		if(!bValidSignature) return false; //return false if an input signature is invalid
+    		
+    		//(3) if current utxo already checked, is duplicate, return as false
+    		if(UniqueUTXOChecked.contains(currUTXO)) {
+    			return false;
+    		} else {
+    			UniqueUTXOChecked.addUTXO(currUTXO, currOutput); //else add into temp utxo pool
+    		}
+    		
+    		//Add up all input value in this transaction
+    		dblSumOfInput += currOutput.value;
+    		
+    		signing_index++;
+    	}
+    	
+    	//(5) return false if sum of output is greater than sum of input
+    	if(dblSumOfInput < dblSumOfOutput) return false;
+    	
+    	return true;
     }
 
     /**
